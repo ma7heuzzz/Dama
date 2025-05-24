@@ -19,7 +19,6 @@ class RealAudioStatusWidget extends StatefulWidget {
 
 class _RealAudioStatusWidgetState extends State<RealAudioStatusWidget> {
   late bool _isMuted;
-  // Usar o tipo correto para o status de áudio
   late AudioStatus _audioStatus;
 
   @override
@@ -28,7 +27,7 @@ class _RealAudioStatusWidgetState extends State<RealAudioStatusWidget> {
     _isMuted = widget.initialMuteState;
     _audioStatus = AudioStatus.initialized;
     
-    // Escutar mudanças de status do áudio usando o stream correto
+    // Escutar mudanças de status do áudio
     widget.audioService.audioStatusEnumStream.listen((status) {
       if (mounted) {
         setState(() {

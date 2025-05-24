@@ -1,4 +1,4 @@
-import 'package:audioplayers/audioplayers.dart';
+import 'dart:html' as html;
 import 'package:flutter/foundation.dart';
 
 class SoundEffectsService {
@@ -8,19 +8,14 @@ class SoundEffectsService {
   
   final _logger = print; // Simplificado para usar print diretamente
   
-  // Players para diferentes efeitos sonoros
-  final AudioPlayer _movePlayer = AudioPlayer();
-  final AudioPlayer _capturePlayer = AudioPlayer();
-  final AudioPlayer _promotionPlayer = AudioPlayer();
-  final AudioPlayer _victoryPlayer = AudioPlayer();
-  final AudioPlayer _defeatPlayer = AudioPlayer();
-  final AudioPlayer _lobbyMusicPlayer = AudioPlayer();
-  final AudioPlayer _pieceSelectPlayer = AudioPlayer();
+  // Mapa de players de áudio para web
+  final Map<String, html.AudioElement> _audioElements = {};
   
   // Estado
   bool _isSoundEnabled = true;
   bool _isLobbyMusicPlaying = false;
   double _volume = 0.7;
+  bool _isInitialized = false;
   
   // Getters
   bool get isSoundEnabled => _isSoundEnabled;
@@ -29,24 +24,71 @@ class SoundEffectsService {
   
   // Inicializar o serviço
   Future<void> initialize() async {
+    if (_isInitialized) return;
+    
     try {
       _logger('Inicializando SoundEffectsService');
       
-      // Configurar volume inicial
-      await _movePlayer.setVolume(_volume);
-      await _capturePlayer.setVolume(_volume);
-      await _promotionPlayer.setVolume(_volume);
-      await _victoryPlayer.setVolume(_volume);
-      await _defeatPlayer.setVolume(_volume);
-      await _pieceSelectPlayer.setVolume(_volume);
-      await _lobbyMusicPlayer.setVolume(_volume * 0.5); // Música de fundo mais baixa
+      // Pré-carregar sons para web
+      if (kIsWeb) {
+        _preloadAudio('sounds/move.mp3', 'move');
+        _preloadAudio('sounds/capture.mp3', 'capture');
+        _preloadAudio('sounds/promotion.mp3', 'promotion');
+        _preloadAudio('sounds/victory.mp3', 'victory');
+        _preloadAudio('sounds/defeat.mp3', 'defeat');
+        _preloadAudio('sounds/lobby_background.mp3', 'lobby', loop: true);
+      }
       
-      // Configurar loop para música do lobby
-      await _lobbyMusicPlayer.setReleaseMode(ReleaseMode.loop);
-      
+      _isInitialized = true;
       _logger('SoundEffectsService inicializado com sucesso');
     } catch (e) {
       _logger('Erro ao inicializar SoundEffectsService: $e');
+    }
+  }
+  
+  // Pré-carregar áudio para web
+  void _preloadAudio(String path, String id, {bool loop = false}) {
+    if (!kIsWeb) return;
+    
+    try {
+      final audioElement = html.AudioElement();
+      audioElement.src = path;
+      audioElement.preload = 'auto';
+      audioElement.volume = _volume;
+      audioElement.loop = loop;
+      _audioElements[id] = audioElement;
+    } catch (e) {
+      _logger('Erro ao pré-carregar áudio $id: $e');
+    }
+  }
+  
+  // Reproduzir som via web
+  Future<void> _playWebSound(String id) async {
+    if (!kIsWeb || !_isSoundEnabled) return;
+    
+    try {
+      final audioElement = _audioElements[id];
+      if (audioElement != null) {
+        audioElement.currentTime = 0;
+        await audioElement.play();
+      }
+    } catch (e) {
+      _logger('Erro ao reproduzir som web $id: $e');
+    }
+  }
+  
+  // Parar som via web
+  Future<void> _stopWebSound(String id) async {
+    if (!kIsWeb) return;
+    
+    try {
+      final audioElement = _audioElements[id];
+      if (audioElement != null) {
+        audioElement.pause();
+        audioElement.currentTime = 0;
+      }
+    } catch (e) {
+      _logger('Erro ao parar som web $id: $e');
     }
   }
   
@@ -59,8 +101,9 @@ class SoundEffectsService {
     if (!_isSoundEnabled) return;
     
     try {
-      await _movePlayer.stop();
-      await _movePlayer.play(AssetSource('sounds/move.mp3'));
+      if (kIsWeb) {
+        await _playWebSound('move');
+      }
       _logger('Som de movimento reproduzido');
     } catch (e) {
       _logger('Erro ao reproduzir som de movimento: $e');
@@ -76,8 +119,9 @@ class SoundEffectsService {
     if (!_isSoundEnabled) return;
     
     try {
-      await _capturePlayer.stop();
-      await _capturePlayer.play(AssetSource('sounds/capture.mp3'));
+      if (kIsWeb) {
+        await _playWebSound('capture');
+      }
       _logger('Som de captura reproduzido');
     } catch (e) {
       _logger('Erro ao reproduzir som de captura: $e');
@@ -89,8 +133,16 @@ class SoundEffectsService {
     if (!_isSoundEnabled) return;
     
     try {
-      await _pieceSelectPlayer.stop();
-      await _pieceSelectPlayer.play(AssetSource('sounds/move.mp3'), volume: 0.3);
+      if (kIsWeb) {
+        // Usar o mesmo som de movimento com volume mais baixo
+        final moveElement = _audioElements['move'];
+        if (moveElement != null) {
+          final originalVolume = moveElement.volume;
+          moveElement.volume = _volume * 0.3;
+          await _playWebSound('move');
+          moveElement.volume = originalVolume;
+        }
+      }
       _logger('Som de seleção de peça reproduzido');
     } catch (e) {
       _logger('Erro ao reproduzir som de seleção de peça: $e');
@@ -102,8 +154,9 @@ class SoundEffectsService {
     if (!_isSoundEnabled) return;
     
     try {
-      await _promotionPlayer.stop();
-      await _promotionPlayer.play(AssetSource('sounds/promotion.mp3'));
+      if (kIsWeb) {
+        await _playWebSound('promotion');
+      }
       _logger('Som de promoção reproduzido');
     } catch (e) {
       _logger('Erro ao reproduzir som de promoção: $e');
@@ -115,8 +168,9 @@ class SoundEffectsService {
     if (!_isSoundEnabled) return;
     
     try {
-      await _victoryPlayer.stop();
-      await _victoryPlayer.play(AssetSource('sounds/victory.mp3'));
+      if (kIsWeb) {
+        await _playWebSound('victory');
+      }
       _logger('Som de vitória reproduzido');
     } catch (e) {
       _logger('Erro ao reproduzir som de vitória: $e');
@@ -128,8 +182,9 @@ class SoundEffectsService {
     if (!_isSoundEnabled) return;
     
     try {
-      await _defeatPlayer.stop();
-      await _defeatPlayer.play(AssetSource('sounds/defeat.mp3'));
+      if (kIsWeb) {
+        await _playWebSound('defeat');
+      }
       _logger('Som de derrota reproduzido');
     } catch (e) {
       _logger('Erro ao reproduzir som de derrota: $e');
@@ -141,8 +196,9 @@ class SoundEffectsService {
     if (!_isSoundEnabled || _isLobbyMusicPlaying) return;
     
     try {
-      await _lobbyMusicPlayer.stop();
-      await _lobbyMusicPlayer.play(AssetSource('sounds/lobby_background.mp3'));
+      if (kIsWeb) {
+        await _playWebSound('lobby');
+      }
       _isLobbyMusicPlaying = true;
       _logger('Música do lobby iniciada');
     } catch (e) {
@@ -155,7 +211,9 @@ class SoundEffectsService {
     if (!_isLobbyMusicPlaying) return;
     
     try {
-      await _lobbyMusicPlayer.stop();
+      if (kIsWeb) {
+        await _stopWebSound('lobby');
+      }
       _isLobbyMusicPlaying = false;
       _logger('Música do lobby parada');
     } catch (e) {
@@ -200,13 +258,12 @@ class SoundEffectsService {
     _volume = volume;
     
     try {
-      await _movePlayer.setVolume(_volume);
-      await _capturePlayer.setVolume(_volume);
-      await _promotionPlayer.setVolume(_volume);
-      await _victoryPlayer.setVolume(_volume);
-      await _defeatPlayer.setVolume(_volume);
-      await _pieceSelectPlayer.setVolume(_volume);
-      await _lobbyMusicPlayer.setVolume(_volume * 0.5); // Música de fundo mais baixa
+      if (kIsWeb) {
+        // Atualizar volume de todos os elementos de áudio
+        _audioElements.forEach((id, element) {
+          element.volume = id == 'lobby' ? _volume * 0.5 : _volume;
+        });
+      }
       
       _logger('Volume ajustado para $_volume');
     } catch (e) {
@@ -216,13 +273,14 @@ class SoundEffectsService {
   
   // Liberar recursos
   void dispose() {
-    _movePlayer.dispose();
-    _capturePlayer.dispose();
-    _promotionPlayer.dispose();
-    _victoryPlayer.dispose();
-    _defeatPlayer.dispose();
-    _pieceSelectPlayer.dispose();
-    _lobbyMusicPlayer.dispose();
+    if (kIsWeb) {
+      // Parar e remover todos os elementos de áudio
+      _audioElements.forEach((id, element) {
+        element.pause();
+        element.remove();
+      });
+      _audioElements.clear();
+    }
     
     _logger('SoundEffectsService liberado');
   }

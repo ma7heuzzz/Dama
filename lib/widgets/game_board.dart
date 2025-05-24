@@ -15,7 +15,6 @@ class GameBoard extends StatefulWidget {
 
 class _GameBoardState extends State<GameBoard> {
   final SoundEffectsService _soundEffectsService = SoundEffectsService();
-  final WebSocketService _webSocketService = WebSocketService();
   Position? _selectedPosition;
 
   @override
@@ -195,37 +194,11 @@ class _GameBoardState extends State<GameBoard> {
     final fromRow = _selectedPosition!.row;
     final fromCol = _selectedPosition!.col;
     
-    // Enviar movimento para o servidor usando WebSocketService diretamente
-    if (_isCapture(gameProvider, row, col)) {
-      // Captura
-      _sendCaptureMove(fromRow, fromCol, row, col);
-    } else {
-      // Movimento simples
-      _sendSimpleMove(fromRow, fromCol, row, col);
-    }
-  }
-  
-  // Método para enviar movimento simples
-  void _sendSimpleMove(int fromRow, int fromCol, int toRow, int toCol) {
-    // Criar objetos Position para o movimento
+    // Enviar movimento para o servidor usando WebSocketService
+    final WebSocketService webSocketService = WebSocketService();
     final from = Position(row: fromRow, col: fromCol);
-    final to = Position(row: toRow, col: toCol);
+    final to = Position(row: row, col: col);
     
-    // Enviar o movimento diretamente para o WebSocketService
-    _webSocketService.sendMove(from, to);
-  }
-  
-  // Método para enviar captura
-  void _sendCaptureMove(int fromRow, int fromCol, int toRow, int toCol) {
-    // Para captura simples, podemos usar o mesmo método de movimento
-    // O servidor irá detectar que é uma captura com base nas posições
-    final from = Position(row: fromRow, col: fromCol);
-    final to = Position(row: toRow, col: toCol);
-    
-    // Enviar o movimento diretamente para o WebSocketService
-    _webSocketService.sendMove(from, to);
-    
-    // Nota: Para capturas múltiplas, seria necessário implementar lógica adicional
-    // usando sendCaptureSequence, mas isso exigiria mais contexto do jogo
+    webSocketService.sendMove(from, to);
   }
 }

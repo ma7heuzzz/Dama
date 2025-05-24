@@ -64,8 +64,8 @@ class _LobbyScreenState extends State<LobbyScreen> {
     try {
       final room = await Provider.of<RoomProvider>(context, listen: false).createRoom();
       if (room != null) {
-        // Navegar para a sala
-        Navigator.of(context).pushNamed('/game', arguments: room.roomCode);
+        // Navegar para a sala usando o formato correto de rota
+        Navigator.of(context).pushNamed('/game/${room.roomCode}');
       }
     } catch (e) {
       // Tratar erro
@@ -85,8 +85,8 @@ class _LobbyScreenState extends State<LobbyScreen> {
   Future<void> _joinRoom(String roomCode) async {
     final success = await Provider.of<RoomProvider>(context, listen: false).joinRoom(roomCode);
     if (success) {
-      // Navegar para a sala
-      Navigator.of(context).pushNamed('/game', arguments: roomCode);
+      // Navegar para a sala usando o formato correto de rota
+      Navigator.of(context).pushNamed('/game/$roomCode');
     } else {
       // Mostrar erro
       ScaffoldMessenger.of(context).showSnackBar(

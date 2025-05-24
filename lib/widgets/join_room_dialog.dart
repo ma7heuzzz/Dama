@@ -60,6 +60,8 @@ class _JoinRoomDialogState extends State<JoinRoomDialog> {
       
       if (success) {
         if (mounted) {
+          // Navegar para a sala usando o formato correto de rota
+          Navigator.of(context).pushNamed('/game/$roomId');
           Navigator.of(context).pop(true); // Retorna true para indicar sucesso
         }
       } else {

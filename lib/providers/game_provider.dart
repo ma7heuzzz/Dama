@@ -51,7 +51,11 @@ class GameProvider extends ChangeNotifier {
   void initializeGame(String roomCode, {String? nickname}) {
     _currentRoomCode = roomCode;
     _playerNickname = nickname;
+    
+    // Garantir que o tabuleiro seja inicializado antes de qualquer operação
     _initializeBoard();
+    
+    // Conectar à sala
     _connectToRoom(roomCode);
   }
   
@@ -343,6 +347,11 @@ class GameProvider extends ChangeNotifier {
   void _handleRoomUpdate(RoomModel room) {
     _logger.i('Recebida atualização da sala: ${room.roomCode}');
     
+    // Garantir que o tabuleiro esteja inicializado
+    if (_board.isEmpty) {
+      _initializeBoard();
+    }
+    
     // Determinar a cor do jogador baseado na ordem de entrada na sala
     final players = room.players;
     
@@ -409,6 +418,13 @@ class GameProvider extends ChangeNotifier {
   
   // Processar movimento do oponente
   void _processOpponentMove(int fromRow, int fromCol, int toRow, int toCol, {bool isPartOfSequence = false}) {
+    // Verificar se o tabuleiro está inicializado e se os índices são válidos
+    if (_board.isEmpty || fromRow >= _board.length || fromCol >= _board[0].length) {
+      _logger.w('Tabuleiro não inicializado ou índices inválidos');
+      _initializeBoard();
+      return;
+    }
+    
     final piece = _board[fromRow][fromCol];
     if (piece == null) {
       _logger.w('Tentativa de mover peça inexistente: ($fromRow,$fromCol)');
@@ -452,6 +468,12 @@ class GameProvider extends ChangeNotifier {
   void _checkForForcedCaptures() {
     _piecesWithCaptures = [];
     
+    // Verificar se o tabuleiro está inicializado
+    if (_board.isEmpty) {
+      _logger.w('Tabuleiro não inicializado ao verificar capturas obrigatórias');
+      return;
+    }
+    
     // Verificar todas as peças da cor atual
     for (int row = 0; row < 8; row++) {
       for (int col = 0; col < 8; col++) {
@@ -470,59 +492,11 @@ class GameProvider extends ChangeNotifier {
       _logger.d('Capturas obrigatórias encontradas: ${_piecesWithCaptures.length}');
       final bool isMyTurn = (_playerColor == 'white' && _isWhiteTurn) || 
                             (_playerColor == 'black' && !_isWhiteTurn);
+      
       if (isMyTurn) {
         _statusMessage = "Captura obrigatória! Selecione uma peça destacada.";
       }
     }
-    
-    notifyListeners();
-  }
-  
-  // Calcular capturas possíveis para uma peça
-  List<Position> _calculateCapturesForPiece(GamePiece piece) {
-    final List<Position> captures = [];
-    final int row = piece.position.row;
-    final int col = piece.position.col;
-    final bool isWhite = piece.isWhite;
-    final bool isKing = piece.isKing;
-    
-    // Direções de movimento (diagonal)
-    final List<List<int>> directions = isKing
-        ? [[-1, -1], [-1, 1], [1, -1], [1, 1]] // Rei pode mover em todas as direções
-        : isWhite
-            ? [[1, -1], [1, 1]] // Peças brancas movem para baixo
-            : [[-1, -1], [-1, 1]]; // Peças pretas movem para cima
-    
-    // Verificar cada direção
-    for (final direction in directions) {
-      final int dr = direction[0];
-      final int dc = direction[1];
-      
-      // Posição do oponente
-      final int opponentRow = row + dr;
-      final int opponentCol = col + dc;
-      
-      // Posição após o oponente
-      final int targetRow = row + 2 * dr;
-      final int targetCol = col + 2 * dc;
-      
-      // Verificar se a posição do oponente está dentro do tabuleiro
-      if (opponentRow >= 0 && opponentRow < 8 && opponentCol >= 0 && opponentCol < 8) {
-        // Verificar se há uma peça oponente
-        final opponentPiece = _board[opponentRow][opponentCol];
-        if (opponentPiece != null && opponentPiece.isWhite != isWhite) {
-          // Verificar se a posição após o oponente está dentro do tabuleiro
-          if (targetRow >= 0 && targetRow < 8 && targetCol >= 0 && targetCol < 8) {
-            // Verificar se a posição após o oponente está vazia
-            if (_board[targetRow][targetCol] == null) {
-              captures.add(Position(row: targetRow, col: targetCol));
-            }
-          }
-        }
-      }
-    }
-    
-    return captures;
   }
   
   // Calcular movimentos possíveis para uma peça
@@ -530,28 +504,35 @@ class GameProvider extends ChangeNotifier {
     final List<Position> moves = [];
     final int row = piece.position.row;
     final int col = piece.position.col;
-    final bool isWhite = piece.isWhite;
-    final bool isKing = piece.isKing;
+    
+    // Verificar se o tabuleiro está inicializado
+    if (_board.isEmpty) {
+      _logger.w('Tabuleiro não inicializado ao calcular movimentos');
+      return moves;
+    }
     
     // Direções de movimento (diagonal)
-    final List<List<int>> directions = isKing
-        ? [[-1, -1], [-1, 1], [1, -1], [1, 1]] // Rei pode mover em todas as direções
-        : isWhite
-            ? [[1, -1], [1, 1]] // Peças brancas movem para baixo
-            : [[-1, -1], [-1, 1]]; // Peças pretas movem para cima
+    final List<List<int>> directions = [];
+    
+    // Peças brancas movem para baixo, peças pretas movem para cima
+    if (piece.isWhite || piece.isKing) {
+      directions.add([1, 1]);  // Diagonal inferior direita
+      directions.add([1, -1]); // Diagonal inferior esquerda
+    }
+    
+    if (!piece.isWhite || piece.isKing) {
+      directions.add([-1, 1]);  // Diagonal superior direita
+      directions.add([-1, -1]); // Diagonal superior esquerda
+    }
     
     // Verificar cada direção
     for (final direction in directions) {
-      final int dr = direction[0];
-      final int dc = direction[1];
+      final int newRow = row + direction[0];
+      final int newCol = col + direction[1];
       
-      // Nova posição
-      final int newRow = row + dr;
-      final int newCol = col + dc;
-      
-      // Verificar se a nova posição está dentro do tabuleiro
+      // Verificar se a posição está dentro do tabuleiro
       if (newRow >= 0 && newRow < 8 && newCol >= 0 && newCol < 8) {
-        // Verificar se a nova posição está vazia
+        // Verificar se a posição está vazia
         if (_board[newRow][newCol] == null) {
           moves.add(Position(row: newRow, col: newCol));
         }
@@ -561,237 +542,73 @@ class GameProvider extends ChangeNotifier {
     return moves;
   }
   
-  // Verificar se uma peça pode ser selecionada
-  bool _canSelectPiece(GamePiece piece) {
-    // Verificar se é a vez do jogador
-    final bool isMyTurn = (_playerColor == 'white' && _isWhiteTurn) || 
-                          (_playerColor == 'black' && !_isWhiteTurn);
+  // Calcular capturas possíveis para uma peça
+  List<Position> _calculateCapturesForPiece(GamePiece piece) {
+    final List<Position> captures = [];
+    final int row = piece.position.row;
+    final int col = piece.position.col;
     
-    // Verificar se a peça é da cor do jogador atual
-    final bool isMyPiece = (piece.isWhite && _playerColor == 'white') || 
-                           (!piece.isWhite && _playerColor == 'black');
-    
-    // Se não for a vez do jogador ou não for uma peça do jogador, não pode selecionar
-    if (!isMyTurn || !isMyPiece) {
-      return false;
+    // Verificar se o tabuleiro está inicializado
+    if (_board.isEmpty) {
+      _logger.w('Tabuleiro não inicializado ao calcular capturas');
+      return captures;
     }
     
-    // Se estiver em captura múltipla, só pode selecionar a mesma peça
-    if (_isInMultiCapture && _selectedPiece != null) {
-      return piece.position.row == _selectedPiece!.position.row && 
-             piece.position.col == _selectedPiece!.position.col;
+    // Direções de captura (diagonal)
+    final List<List<int>> directions = [];
+    
+    // Peças brancas capturam para baixo, peças pretas capturam para cima
+    if (piece.isWhite || piece.isKing) {
+      directions.add([1, 1]);  // Diagonal inferior direita
+      directions.add([1, -1]); // Diagonal inferior esquerda
     }
     
-    // Se houver capturas obrigatórias, só pode selecionar peças com capturas
-    if (_piecesWithCaptures.isNotEmpty) {
-      return _piecesWithCaptures.any((p) => 
-        p.position.row == piece.position.row && 
-        p.position.col == piece.position.col
-      );
+    if (!piece.isWhite || piece.isKing) {
+      directions.add([-1, 1]);  // Diagonal superior direita
+      directions.add([-1, -1]); // Diagonal superior esquerda
     }
     
-    // Caso contrário, pode selecionar qualquer peça da cor do jogador atual
-    return true;
-  }
-  
-  // Verificar se uma peça está em captura múltipla
-  bool isPieceInMultiCapture(int row, int col) {
-    return _isInMultiCapture && 
-           _selectedPiece != null && 
-           _selectedPiece!.position.row == row && 
-           _selectedPiece!.position.col == col;
-  }
-  
-  // Selecionar uma posição no tabuleiro
-  void selectTile(int row, int col) {
-    // Verificar se o jogo já começou
-    if (!_gameStarted) {
-      _logger.w('Tentativa de selecionar posição antes do início do jogo');
-      return;
-    }
-    
-    // Verificar se é a vez do jogador
-    final bool isMyTurn = (_playerColor == 'white' && _isWhiteTurn) || 
-                          (_playerColor == 'black' && !_isWhiteTurn);
-    
-    if (!isMyTurn) {
-      _logger.w('Tentativa de selecionar posição fora do turno');
-      return;
-    }
-    
-    // Obter a peça na posição selecionada
-    final piece = _board[row][col];
-    
-    // Se já há uma peça selecionada
-    if (_selectedPiece != null) {
-      // Verificar se a posição selecionada é um movimento possível
-      final bool isValidMove = _possibleMoves.any(
-        (pos) => pos.row == row && pos.col == col
-      );
+    // Verificar cada direção
+    for (final direction in directions) {
+      final int captureRow = row + direction[0];
+      final int captureCol = col + direction[1];
+      final int landingRow = row + 2 * direction[0];
+      final int landingCol = col + 2 * direction[1];
       
-      if (isValidMove) {
-        // Executar o movimento
-        _makeMove(_selectedPiece!.position.row, _selectedPiece!.position.col, row, col);
-      } else if (piece != null && _canSelectPiece(piece)) {
-        // Selecionar outra peça
-        _selectPiece(piece);
-      } else {
-        // Desselecionar a peça atual
-        _selectedPiece = null;
-        _possibleMoves = [];
-        notifyListeners();
+      // Verificar se as posições estão dentro do tabuleiro
+      if (captureRow >= 0 && captureRow < 8 && captureCol >= 0 && captureCol < 8 &&
+          landingRow >= 0 && landingRow < 8 && landingCol >= 0 && landingCol < 8) {
+        
+        // Verificar se há uma peça adversária para capturar
+        final capturedPiece = _board[captureRow][captureCol];
+        if (capturedPiece != null && capturedPiece.isWhite != piece.isWhite) {
+          // Verificar se a posição de destino está vazia
+          if (_board[landingRow][landingCol] == null) {
+            captures.add(Position(row: landingRow, col: landingCol));
+          }
+        }
       }
-    } 
-    // Se não há peça selecionada e há uma peça na posição
-    else if (piece != null && _canSelectPiece(piece)) {
-      _selectPiece(piece);
     }
+    
+    return captures;
   }
   
-  // Selecionar uma peça
-  void _selectPiece(GamePiece piece) {
-    _selectedPiece = piece;
-    
-    // Calcular movimentos possíveis
-    _possibleMoves = [];
-    
-    // Se houver capturas obrigatórias, só mostrar capturas
-    if (_piecesWithCaptures.isNotEmpty) {
-      _possibleMoves = _calculateCapturesForPiece(piece);
-    } else {
-      // Caso contrário, mostrar todos os movimentos possíveis
-      _possibleMoves = [
-        ..._calculateMovesForPiece(piece),
-        ..._calculateCapturesForPiece(piece),
-      ];
-    }
-    
-    notifyListeners();
+  // Verificar se uma peça tem capturas disponíveis
+  bool _hasCapturesAvailable(GamePiece piece) {
+    return _calculateCapturesForPiece(piece).isNotEmpty;
   }
   
-  // Executar um movimento
-  void _makeMove(int fromRow, int fromCol, int toRow, int toCol) {
-    final piece = _board[fromRow][fromCol];
-    if (piece == null) return;
-    
-    // Verificar se é um movimento de captura
-    final bool isCapture = (toRow - fromRow).abs() == 2;
-    
-    // Criar nova peça na posição de destino
-    final newPiece = GamePiece(
-      position: Position(row: toRow, col: toCol),
-      isWhite: piece.isWhite,
-      isKing: piece.isKing || (piece.isWhite && toRow == 7) || (!piece.isWhite && toRow == 0),
-    );
-    
-    // Remover peça da posição original
-    _board[fromRow][fromCol] = null;
-    
-    // Colocar peça na nova posição
-    _board[toRow][toCol] = newPiece;
-    
-    // Se for captura, remover a peça capturada
-    if (isCapture) {
-      final int capturedRow = (fromRow + toRow) ~/ 2;
-      final int capturedCol = (fromCol + toCol) ~/ 2;
-      _board[capturedRow][capturedCol] = null;
-      
-      // Adicionar movimento à sequência de capturas
-      _captureSequence.add({
-        'from': {'row': fromRow, 'col': fromCol},
-        'to': {'row': toRow, 'col': toCol},
-      });
-      
-      // Verificar se há mais capturas possíveis com a mesma peça
-      final moreCapturesPossible = _calculateCapturesForPiece(newPiece).isNotEmpty;
-      
-      if (moreCapturesPossible) {
-        // Continuar a captura múltipla
-        _isInMultiCapture = true;
-        _selectedPiece = newPiece;
-        _possibleMoves = _calculateCapturesForPiece(newPiece);
-        _statusMessage = "Continue a captura com a mesma peça!";
-        notifyListeners();
-        return;
-      } else {
-        // Finalizar a sequência de capturas
-        _sendCaptureSequence();
-      }
-    } else {
-      // Movimento simples
-      _sendMove(fromRow, fromCol, toRow, toCol);
-    }
-    
-    // Resetar seleção
-    _selectedPiece = null;
-    _possibleMoves = [];
-    _isInMultiCapture = false;
-    _captureSequence = [];
-    
-    notifyListeners();
-  }
-  
-  // Enviar movimento para o servidor
-  void _sendMove(int fromRow, int fromCol, int toRow, int toCol) {
-    if (_currentRoomCode != null) {
-      // Criar objetos Position para from e to
-      final from = Position(row: fromRow, col: fromCol);
-      final to = Position(row: toRow, col: toCol);
-      
-      // Chamar o método makeMove com a assinatura correta
-      _webSocketService.makeMove(_currentRoomCode!, from, to);
-      
-      // Trocar o turno localmente
-      _isWhiteTurn = !_isWhiteTurn;
-      _updateStatusMessage();
-    }
-  }
-  
-  // Enviar sequência de capturas para o servidor
-  void _sendCaptureSequence() {
-    if (_currentRoomCode != null && _captureSequence.isNotEmpty) {
-      // Chamar o método sendCaptureSequence com a assinatura correta
-      _webSocketService.sendCaptureSequence(
-        _captureSequence,
-        _currentRoomCode!,
-        _playerNickname ?? 'Jogador'
-      );
-      
-      // Trocar o turno localmente após a sequência completa
-      _isWhiteTurn = !_isWhiteTurn;
-      _updateStatusMessage();
-      
-      // Limpar a sequência
-      _captureSequence = [];
-    }
+  // Verificar se uma peça tem movimentos disponíveis
+  bool _hasMovesAvailable(GamePiece piece) {
+    return _calculateMovesForPiece(piece).isNotEmpty;
   }
   
   // Sair da sala
   Future<void> leaveRoom() async {
     if (_currentRoomCode != null) {
       await _webSocketService.leaveRoom(_currentRoomCode!);
+      _currentRoomCode = null;
       _audioService.disconnect();
     }
-    
-    _currentRoomCode = null;
-    _playerColor = null;
-    _opponentNickname = null;
-    _isConnected = false;
-    _gameStarted = false;
-    _selectedPiece = null;
-    _possibleMoves = [];
-    _isInMultiCapture = false;
-    _captureSequence = [];
-    _showVictoryAnimation = false;
-    _winnerColor = null;
-    
-    notifyListeners();
-  }
-  
-  // Limpar recursos
-  void dispose() {
-    _webSocketService.disconnect();
-    _audioService.dispose();
-    super.dispose();
   }
 }
