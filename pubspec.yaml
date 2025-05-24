@@ -1,0 +1,63 @@
+name: xdama
+description: Jogo de Damas multiplayer com chat de voz automático entre os jogadores. Minimalista, rápido, sem fricção.
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.2
+  flutter_webrtc:
+    git:
+      url: https://github.com/flutter-webrtc/flutter-webrtc.git
+      ref: main
+  shared_preferences: ^2.2.2  # Versão ajustada para compatibilidade com SDK 3.3.1
+  http: ^0.13.6  # Versão ajustada para compatibilidade com SDK 3.3.1
+
+  # Gerenciamento de estado
+  provider: ^6.0.5
+
+  # Comunicação em tempo real
+  web_socket_channel: ^2.4.0
+  socket_io_client: ^2.0.3+1
+
+  # Navegação
+  go_router: ^10.1.2
+
+  # Utilitários
+  uuid: ^3.0.7
+  equatable: ^2.0.5
+  logger: ^1.4.0
+  audioplayers: ^5.2.1
+
+  # Splash screen
+  flutter_native_splash: ^2.3.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^2.0.2
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    - assets/images/
+    - assets/sounds/
+
+flutter_native_splash:
+  color: "#42a5f5"
+  image: assets/images/logo.png
+  color_dark: "#121212"
+  image_dark: assets/images/logo.png
+
+  android_12:
+    image: assets/images/logo.png
+    icon_background_color: "#42a5f5"
+    image_dark: assets/images/logo.png
+    icon_background_color_dark: "#121212"
+
+  web: true

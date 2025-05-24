@@ -1,0 +1,42 @@
+linter:
+  rules:
+    # Estilo
+    - always_declare_return_types
+    - always_put_required_named_parameters_first
+    - avoid_print
+    - avoid_unnecessary_containers
+    - avoid_web_libraries_in_flutter
+    - empty_catches
+    - prefer_const_constructors
+    - prefer_const_declarations
+    - prefer_single_quotes
+    - sort_child_properties_last
+    - use_key_in_widget_constructors
+    
+    # Formatação
+    - lines_longer_than_80_chars
+    - prefer_single_quotes
+    
+    # Boas práticas
+    - avoid_empty_else
+    - avoid_relative_lib_imports
+    - avoid_returning_null_for_future
+    - avoid_slow_async_io
+    - cancel_subscriptions
+    - close_sinks
+    - package_api_docs
+    - prefer_final_fields
+    - prefer_final_locals
+    - test_types_in_equals
+    - throw_in_finally
+    - unawaited_futures
+    
+analyzer:
+  errors:
+    # Tratar avisos de acessibilidade como erros
+    missing_required_param: error
+    missing_return: error
+    
+  exclude:
+    - "**/*.g.dart"
+    - "**/*.freezed.dart"
