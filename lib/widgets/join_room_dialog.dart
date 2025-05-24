@@ -60,21 +60,30 @@ class _JoinRoomDialogState extends State<JoinRoomDialog> {
       
       if (success) {
         if (mounted) {
-          // Navegar para a sala usando o formato correto de rota
-          Navigator.of(context).pushNamed('/game/$roomId');
-          Navigator.of(context).pop(true); // Retorna true para indicar sucesso
+          // Primeiro fechar o diálogo, depois navegar
+          Navigator.of(context).pop(true);
+          // Pequeno delay para garantir que o diálogo foi fechado
+          await Future.delayed(const Duration(milliseconds: 100));
+          // Navegar para a sala
+          if (mounted) {
+            Navigator.of(context).pushNamed('/game/$roomId');
+          }
         }
       } else {
+        if (mounted) {
+          setState(() {
+            _errorMessage = 'Sala não encontrada ou cheia';
+            _isLoading = false;
+          });
+        }
+      }
+    } catch (e) {
+      if (mounted) {
         setState(() {
-          _errorMessage = 'Sala não encontrada ou cheia';
+          _errorMessage = 'Erro ao entrar na sala: $e';
           _isLoading = false;
         });
       }
-    } catch (e) {
-      setState(() {
-        _errorMessage = 'Erro ao entrar na sala: $e';
-        _isLoading = false;
-      });
     }
   }
 

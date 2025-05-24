@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:xdama/models/room_model.dart';
 import 'package:xdama/services/room_service.dart';
+import 'package:xdama/services/user_service.dart';
 import 'package:xdama/services/websocket_service.dart';
 
 class RoomProvider extends ChangeNotifier {
   final RoomService _roomService = RoomService();
   final WebSocketService _webSocketService = WebSocketService();
+  final UserService _userService = UserService();
   
   List<RoomModel> _rooms = [];
   RoomModel? _currentRoom;
@@ -60,9 +62,33 @@ class RoomProvider extends ChangeNotifier {
     }
   }
   
-  // Método refreshRooms como alias para loadRooms
+  // Método refreshRooms melhorado
   Future<void> refreshRooms() async {
-    await loadRooms();
+    _isLoading = true;
+    _errorMessage = null;
+    notifyListeners();
+    
+    try {
+      // Forçar reconexão se necessário
+      final user = await _userService.getUser();
+      if (user != null) {
+        await _webSocketService.ensureConnected(user.nickname);
+      }
+      
+      // Solicitar lista de salas
+      _webSocketService.emitEvent('getRooms');
+      
+      // Aguardar um curto período para receber a resposta
+      await Future.delayed(const Duration(milliseconds: 500));
+      
+      _rooms = await _roomService.getRooms();
+      _isLoading = false;
+      notifyListeners();
+    } catch (e) {
+      _errorMessage = e.toString();
+      _isLoading = false;
+      notifyListeners();
+    }
   }
   
   // Criar uma nova sala
@@ -87,7 +113,7 @@ class RoomProvider extends ChangeNotifier {
     }
   }
   
-  // Entrar em uma sala
+  // Entrar em uma sala com melhor gerenciamento de estado
   Future<bool> joinRoom(String roomCode) async {
     _isLoading = true;
     _errorMessage = null;
@@ -96,6 +122,16 @@ class RoomProvider extends ChangeNotifier {
     try {
       final success = await _roomService.joinRoom(roomCode);
       _isLoading = false;
+      
+      // Se bem-sucedido, buscar a sala atual do serviço
+      if (success) {
+        // Buscar a sala atual do serviço
+        final currentRoom = _roomService.getCurrentRoom();
+        if (currentRoom != null) {
+          _currentRoom = currentRoom;
+        }
+      }
+      
       notifyListeners();
       return success;
     } catch (e) {
@@ -104,6 +140,11 @@ class RoomProvider extends ChangeNotifier {
       notifyListeners();
       return false;
     }
+  }
+  
+  // Obter sala atual
+  RoomModel? getCurrentRoom() {
+    return _currentRoom;
   }
   
   // Encerrar uma sala (método adicionado)
@@ -135,12 +176,16 @@ class RoomProvider extends ChangeNotifier {
     }
   }
   
-  // Sair da sala atual
+  // Sair da sala atual - corrigido para não desconectar o WebSocket
   void leaveCurrentRoom() {
     if (_currentRoom != null) {
-      _webSocketService.disconnect();
+      final roomCode = _currentRoom!.roomCode;
+      _webSocketService.leaveRoom(roomCode); // Usar leaveRoom em vez de disconnect
       _currentRoom = null;
       notifyListeners();
+      
+      // Atualizar lista de salas após sair
+      refreshRooms();
     }
   }
   

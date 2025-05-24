@@ -43,16 +43,20 @@ class _LobbyScreenState extends State<LobbyScreen> {
       await Provider.of<RoomProvider>(context, listen: false).loadRooms();
     } catch (e) {
       // Tratar erro
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Erro ao carregar salas: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erro ao carregar salas: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     } finally {
-      setState(() {
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 
@@ -62,39 +66,82 @@ class _LobbyScreenState extends State<LobbyScreen> {
     });
 
     try {
-      final room = await Provider.of<RoomProvider>(context, listen: false).createRoom();
+      final roomProvider = Provider.of<RoomProvider>(context, listen: false);
+      final room = await roomProvider.createRoom();
+      
       if (room != null) {
         // Navegar para a sala usando o formato correto de rota
-        Navigator.of(context).pushNamed('/game/${room.roomCode}');
+        if (mounted) {
+          Navigator.of(context).pushNamed('/game/${room.roomCode}');
+        }
+      } else {
+        // Mostrar erro
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Erro ao criar sala. Tente novamente.'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
       }
     } catch (e) {
       // Tratar erro
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Erro ao criar sala: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erro ao criar sala: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     } finally {
-      setState(() {
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 
   Future<void> _joinRoom(String roomCode) async {
-    final success = await Provider.of<RoomProvider>(context, listen: false).joinRoom(roomCode);
-    if (success) {
-      // Navegar para a sala usando o formato correto de rota
-      Navigator.of(context).pushNamed('/game/$roomCode');
-    } else {
-      // Mostrar erro
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Sala não encontrada ou cheia'),
-          backgroundColor: Colors.red,
-        ),
-      );
+    setState(() {
+      _isLoading = true;
+    });
+    
+    try {
+      final success = await Provider.of<RoomProvider>(context, listen: false).joinRoom(roomCode);
+      if (success) {
+        // Navegar para a sala usando o formato correto de rota
+        if (mounted) {
+          Navigator.of(context).pushNamed('/game/$roomCode');
+        }
+      } else {
+        // Mostrar erro
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Sala não encontrada ou cheia'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erro ao entrar na sala: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 

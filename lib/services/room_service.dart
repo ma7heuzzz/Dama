@@ -24,6 +24,7 @@ class RoomService {
   // Subscrições
   StreamSubscription? _roomListSubscription;
   StreamSubscription? _roomUpdateSubscription;
+  StreamSubscription? _joinedRoomSubscription; // Nova subscrição para joinedRoom
   StreamSubscription? _errorSubscription;
   
   RoomService() {
@@ -35,6 +36,12 @@ class RoomService {
     _roomListSubscription = _webSocketService.roomListStream.listen((rooms) {
       _currentRooms = rooms;
       _roomsController.add(rooms);
+    });
+    
+    // Inscrever-se no stream de joinedRoom
+    _joinedRoomSubscription = _webSocketService.joinedRoomStream.listen((room) {
+      _currentRoom = room;
+      _currentRoomController.add(room);
     });
     
     // Inscrever-se no stream de atualização de sala
@@ -54,8 +61,8 @@ class RoomService {
     try {
       // Garantir que estamos conectados
       final user = await _userService.getUser();
-      if (user != null && !_webSocketService.isConnected) {
-        await _webSocketService.connect(user.nickname);
+      if (user != null) {
+        await _webSocketService.ensureConnected(user.nickname);
       }
       
       // Solicitar lista de salas ao servidor
@@ -69,6 +76,11 @@ class RoomService {
     }
   }
   
+  // Obter sala atual
+  RoomModel? getCurrentRoom() {
+    return _currentRoom;
+  }
+  
   // Criar uma nova sala
   Future<RoomModel?> createRoom() async {
     try {
@@ -78,9 +90,7 @@ class RoomService {
       }
       
       // Garantir que estamos conectados
-      if (!_webSocketService.isConnected) {
-        await _webSocketService.connect(user.nickname);
-      }
+      await _webSocketService.ensureConnected(user.nickname);
       
       // Gerar código de sala aleatório
       final roomCode = _generateRoomCode();
@@ -91,8 +101,8 @@ class RoomService {
       // Aguardar resposta do servidor (joinedRoom event)
       final completer = Completer<RoomModel?>();
       
-      // Ouvir atualizações de sala por 5 segundos
-      final subscription = _webSocketService.roomUpdateStream.listen((room) {
+      // Ouvir evento joinedRoom por 15 segundos (aumentado de 5 para 15)
+      final subscription = _webSocketService.joinedRoomStream.listen((room) {
         if (room.roomCode == roomCode && !completer.isCompleted) {
           completer.complete(room);
         }
@@ -105,8 +115,8 @@ class RoomService {
         }
       });
       
-      // Timeout após 5 segundos
-      Future.delayed(const Duration(seconds: 5), () {
+      // Timeout após 15 segundos (aumentado de 5 para 15)
+      Future.delayed(const Duration(seconds: 15), () {
         if (!completer.isCompleted) {
           completer.complete(null);
         }
@@ -135,9 +145,7 @@ class RoomService {
       }
       
       // Garantir que estamos conectados
-      if (!_webSocketService.isConnected) {
-        await _webSocketService.connect(user.nickname);
-      }
+      await _webSocketService.ensureConnected(user.nickname);
       
       // Entrar na sala via WebSocket
       _webSocketService.joinRoom(roomCode);
@@ -145,8 +153,8 @@ class RoomService {
       // Aguardar resposta do servidor (joinedRoom event)
       final completer = Completer<bool>();
       
-      // Ouvir atualizações de sala por 5 segundos
-      final subscription = _webSocketService.roomUpdateStream.listen((room) {
+      // Ouvir evento joinedRoom por 15 segundos (aumentado de 5 para 15)
+      final subscription = _webSocketService.joinedRoomStream.listen((room) {
         if (room.roomCode == roomCode && !completer.isCompleted) {
           completer.complete(true);
         }
@@ -159,8 +167,8 @@ class RoomService {
         }
       });
       
-      // Timeout após 5 segundos
-      Future.delayed(const Duration(seconds: 5), () {
+      // Timeout após 15 segundos (aumentado de 5 para 15)
+      Future.delayed(const Duration(seconds: 15), () {
         if (!completer.isCompleted) {
           completer.complete(false);
         }
@@ -199,6 +207,7 @@ class RoomService {
   void dispose() {
     _roomListSubscription?.cancel();
     _roomUpdateSubscription?.cancel();
+    _joinedRoomSubscription?.cancel(); // Cancelar a nova subscrição
     _errorSubscription?.cancel();
     _roomsController.close();
     _currentRoomController.close();

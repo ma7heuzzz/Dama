@@ -40,12 +40,18 @@ class RoomModel {
   });
 
   factory RoomModel.fromJson(Map<String, dynamic> json) {
-    return RoomModel(
-      id: json['id'] as String,
-      creator: json['creator'] as String,
-      players: (json['players'] as List<dynamic>)
+    // Verificar se o campo 'players' existe e é uma lista
+    List<Player> playersList = [];
+    if (json['players'] != null && json['players'] is List) {
+      playersList = (json['players'] as List<dynamic>)
           .map((player) => Player.fromJson(player as Map<String, dynamic>))
-          .toList(),
+          .toList();
+    }
+
+    return RoomModel(
+      id: json['id'] as String? ?? json['roomCode'] as String, // Aceitar ambos os campos
+      creator: json['creator'] as String? ?? json['hostNickname'] as String? ?? '', // Aceitar ambos os campos
+      players: playersList,
       board: json['board'],
       currentTurn: json['currentTurn'] as String? ?? 'white',
     );
@@ -54,8 +60,12 @@ class RoomModel {
   Map<String, dynamic> toJson() {
     return {
       'id': id,
+      'roomCode': id, // Adicionar para compatibilidade com o servidor
       'creator': creator,
+      'hostNickname': hostNickname, // Adicionar para compatibilidade com o servidor
       'players': players.map((player) => player.toJson()).toList(),
+      'playerCount': playerCount, // Adicionar para compatibilidade com o servidor
+      'maxPlayers': maxPlayers, // Adicionar para compatibilidade com o servidor
       'board': board,
       'currentTurn': currentTurn,
     };

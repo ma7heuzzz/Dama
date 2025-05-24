@@ -21,6 +21,7 @@ class WebSocketService {
 
   final _roomListController = StreamController<List<RoomModel>>.broadcast();
   final _roomUpdateController = StreamController<RoomModel>.broadcast();
+  final _joinedRoomController = StreamController<RoomModel>.broadcast(); // Novo controller para joinedRoom
   final _boardUpdateController = StreamController<Map<String, dynamic>>.broadcast();
   final _errorController = StreamController<String>.broadcast();
   final _roomClosedController = StreamController<Map<String, dynamic>>.broadcast();
@@ -32,6 +33,7 @@ class WebSocketService {
 
   Stream<List<RoomModel>> get roomListStream => _roomListController.stream;
   Stream<RoomModel> get roomUpdateStream => _roomUpdateController.stream;
+  Stream<RoomModel> get joinedRoomStream => _joinedRoomController.stream; // Novo getter para joinedRoom
   Stream<Map<String, dynamic>> get boardUpdateStream => _boardUpdateController.stream;
   Stream<String> get errorStream => _errorController.stream;
   Stream<Map<String, dynamic>> get roomClosedStream => _roomClosedController.stream;
@@ -58,6 +60,18 @@ class WebSocketService {
     if (_isDebug) {
       print('[WebSocketService] $message');
     }
+  }
+
+  // Verificar e reconectar se necessário
+  Future<bool> ensureConnected(String nickname) async {
+    if (_socket == null || !_isConnected) {
+      return await connect(nickname);
+    } else if (_nickname != nickname) {
+      _nickname = nickname;
+      _socket!.emit('setNickname', nickname);
+      _log('Nickname atualizado para: $nickname');
+    }
+    return true;
   }
 
   // Conectar ao servidor
@@ -126,7 +140,7 @@ class WebSocketService {
         try {
           final room = RoomModel.fromJson(data);
           _currentRoomCode = room.roomCode;
-          _roomUpdateController.add(room);
+          _joinedRoomController.add(room); // Usar o novo controller
         } catch (e) {
           _log('Erro ao processar entrada na sala: $e');
         }
@@ -136,7 +150,7 @@ class WebSocketService {
         _log('Atualização da sala: $data');
         try {
           final room = RoomModel.fromJson(data);
-          _roomUpdateController.add(room);
+          _roomUpdateController.add(room); // Manter este para atualizações
         } catch (e) {
           _log('Erro ao processar atualização de sala: $e');
         }
@@ -256,10 +270,9 @@ class WebSocketService {
 
   // Criar uma sala
   void createRoom(String roomCode) {
-    if (_socket == null) {
-      _log('Socket não inicializado ao tentar criar sala');
-      connect(_nickname ?? 'Jogador');
-      Future.delayed(Duration(milliseconds: 500), () {
+    if (!_isConnected) {
+      _log('Socket não conectado ao tentar criar sala');
+      ensureConnected(_nickname ?? 'Jogador').then((_) {
         createRoom(roomCode);
       });
       return;
@@ -271,10 +284,9 @@ class WebSocketService {
 
   // Entrar em uma sala
   void joinRoom(String roomCode) {
-    if (_socket == null) {
-      _log('Socket não inicializado ao tentar entrar na sala');
-      connect(_nickname ?? 'Jogador');
-      Future.delayed(Duration(milliseconds: 500), () {
+    if (!_isConnected) {
+      _log('Socket não conectado ao tentar entrar na sala');
+      ensureConnected(_nickname ?? 'Jogador').then((_) {
         joinRoom(roomCode);
       });
       return;
@@ -413,6 +425,7 @@ class WebSocketService {
     disconnect();
     _roomListController.close();
     _roomUpdateController.close();
+    _joinedRoomController.close(); // Fechar o novo controller
     _boardUpdateController.close();
     _errorController.close();
     _roomClosedController.close();
