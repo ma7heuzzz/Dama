@@ -1,3 +1,32 @@
-# Project exclude paths
-/.dart_tool/
-/build/
+# Flutter/Dart
+.dart_tool/
+.packages
+build/
+.flutter-plugins
+.flutter-plugins-dependencies
+.melos_tool/
+.pub-cache/
+.pub/
+.idea/
+
+# Android
+android/.gradle/
+android/local.properties
+android/.idea/
+
+# iOS
+ios/Pods/
+ios/Flutter/Flutter.framework
+ios/Flutter/Flutter.podspec
+ios/.symlinks/
+ios/Runner.xcworkspace/
+
+# VS Code
+.vscode/
+
+# IntelliJ
+*.iml
+.idea/
+
+# Outros
+.env
